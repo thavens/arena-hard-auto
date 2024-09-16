@@ -4,6 +4,7 @@ import time
 import yaml
 import random
 import requests
+import io
 
 from typing import Optional
 from glob import glob
@@ -79,9 +80,7 @@ def get_endpoint(endpoint_list):
         return None
     assert endpoint_list is not None
     # randomly pick one
-    api_dict = random.choices(
-        endpoint_list
-    )[0]
+    api_dict = random.choices(endpoint_list)[0]
     return api_dict
 
 
@@ -96,6 +95,7 @@ def make_config(config_file: str) -> dict:
 
 def chat_completion_openai(model, messages, temperature, max_tokens, api_dict=None):
     import openai
+
     if api_dict:
         client = openai.OpenAI(
             base_url=api_dict["api_base"],
@@ -103,7 +103,7 @@ def chat_completion_openai(model, messages, temperature, max_tokens, api_dict=No
         )
     else:
         client = openai.OpenAI()
-    
+
     output = API_ERROR_OUTPUT
     for _ in range(API_MAX_RETRY):
         try:
@@ -112,7 +112,7 @@ def chat_completion_openai(model, messages, temperature, max_tokens, api_dict=No
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                )
+            )
             output = completion.choices[0].message.content
             break
         except openai.RateLimitError as e:
@@ -124,21 +124,23 @@ def chat_completion_openai(model, messages, temperature, max_tokens, api_dict=No
         except KeyError:
             print(type(e), e)
             break
-    
+
     return output
 
 
-def chat_completion_openai_azure(model, messages, temperature, max_tokens, api_dict=None):
+def chat_completion_openai_azure(
+    model, messages, temperature, max_tokens, api_dict=None
+):
     import openai
     from openai import AzureOpenAI
 
     api_base = api_dict["api_base"]
     client = AzureOpenAI(
-        azure_endpoint = api_base,
-        api_key= api_dict["api_key"],
+        azure_endpoint=api_base,
+        api_key=api_dict["api_key"],
         api_version=api_dict["api_version"],
         timeout=240,
-        max_retries=2
+        max_retries=2,
     )
 
     output = API_ERROR_OUTPUT
@@ -190,7 +192,7 @@ def chat_completion_anthropic(model, messages, temperature, max_tokens, api_dict
                 stop_sequences=[anthropic.HUMAN_PROMPT],
                 max_tokens=max_tokens,
                 temperature=temperature,
-                system=sys_msg
+                system=sys_msg,
             )
             output = response.content[0].text
             break
@@ -208,8 +210,11 @@ def chat_completion_mistral(model, messages, temperature, max_tokens):
     api_key = os.environ["MISTRAL_API_KEY"]
     client = MistralClient(api_key=api_key)
 
-    prompts = [ChatMessage(role=message["role"], content=message["content"]) for message in messages]
-    
+    prompts = [
+        ChatMessage(role=message["role"], content=message["content"])
+        for message in messages
+    ]
+
     output = API_ERROR_OUTPUT
     for _ in range(API_MAX_RETRY):
         try:
@@ -230,24 +235,12 @@ def chat_completion_mistral(model, messages, temperature, max_tokens):
 
 def http_completion_gemini(model, message, temperature, max_tokens):
     api_key = os.environ["GEMINI_API_KEY"]
-    
+
     safety_settings = [
-        {
-            "category": "HARM_CATEGORY_HARASSMENT",
-            "threshold": "BLOCK_NONE"
-        },
-        {
-            "category": "HARM_CATEGORY_HATE_SPEECH",
-            "threshold": "BLOCK_NONE"
-        },
-        {
-            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            "threshold": "BLOCK_NONE"
-        },
-        {
-            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-            "threshold": "BLOCK_NONE"
-        },
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     ]
 
     output = API_ERROR_OUTPUT
@@ -255,16 +248,12 @@ def http_completion_gemini(model, message, temperature, max_tokens):
         response = requests.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
             json={
-                "contents": [{
-                    "parts":[
-                        {"text": message}
-                    ]
-                }],
+                "contents": [{"parts": [{"text": message}]}],
                 "safetySettings": safety_settings,
-                "generationConfig":{
+                "generationConfig": {
                     "temperature": temperature,
                     "maxOutputTokens": max_tokens,
-                }
+                },
             },
         )
     except Exception as e:
@@ -276,7 +265,6 @@ def http_completion_gemini(model, message, temperature, max_tokens):
     output = response.json()["candidates"][0]["content"]["parts"][0]["text"]
 
     return output
-    
 
 
 def chat_completion_cohere(model, messages, temperature, max_tokens):
@@ -285,9 +273,7 @@ def chat_completion_cohere(model, messages, temperature, max_tokens):
     co = cohere.Client(os.environ["COHERE_API_KEY"])
     assert len(messages) > 0
 
-    template_map = {"system":"SYSTEM",
-                    "assistant":"CHATBOT",
-                    "user":"USER"}
+    template_map = {"system": "SYSTEM", "assistant": "CHATBOT", "user": "USER"}
 
     assert messages[-1]["role"] == "user"
     prompt = messages[-1]["content"]
@@ -295,7 +281,9 @@ def chat_completion_cohere(model, messages, temperature, max_tokens):
     if len(messages) > 1:
         history = []
         for message in messages[:-1]:
-            history.append({"role":template_map[message["role"]], "message":message["content"]})
+            history.append(
+                {"role": template_map[message["role"]], "message": message["content"]}
+            )
     else:
         history = None
 
@@ -317,7 +305,7 @@ def chat_completion_cohere(model, messages, temperature, max_tokens):
         except Exception as e:
             print(type(e), e)
             break
-    
+
     return output
 
 
@@ -333,3 +321,172 @@ def reorg_answer_file(answer_file):
     with open(answer_file, "w") as fout:
         for qid in qids:
             fout.write(answers[qid])
+
+
+# {
+#    "custom_id":"request-1",
+#    "method":"POST",
+#    "url":"/v1/chat/completions",
+#    "body":{
+#       "model":"gpt-3.5-turbo-0125",
+#       "messages":[
+#          {
+#             "role":"system",
+#             "content":"You are a helpful assistant."
+#          },
+#          {
+#             "role":"user",
+#             "content":"Hello world!"
+#          }
+#       ],
+#       "max_tokens":1000
+#    }
+# }
+# {
+#    "custom_id":"request-2",
+#    "method":"POST",
+#    "url":"/v1/chat/completions",
+#    "body":{
+#       "model":"gpt-3.5-turbo-0125",
+#       "messages":[
+#          {
+#             "role":"system",
+#             "content":"You are an unhelpful assistant."
+#          },
+#          {
+#             "role":"user",
+#             "content":"Hello world!"
+#          }
+#       ],
+#       "max_tokens":1000
+#    }
+# }
+def conv_jsonl_to_batch_format(
+    convs: list[list], model: str, temp: float, max_tok: int
+):
+    request = []
+    for idx, conv in enumerate(convs):
+        request.append(
+            {
+                "custom_id": str(idx),
+                "method": "POST",
+                "url": "/v1/chat/completions",
+                "body": {
+                    "model": model,
+                    "messages": conv,
+                    "temperature": temp,
+                    "max_tokens": max_tok,
+                },
+            }
+        )
+    return request
+
+
+#  endpoint_info["model_name"], configs["temperature"], configs["max_tokens"]
+def batch_api_call(
+    convs: list[list], model: str, temp: float, max_tok: int, api_dict=None, shortcut=""
+):
+    if len(convs) == 0:
+        return []
+
+    import openai
+
+    if api_dict:
+        client = openai.OpenAI(
+            base_url=api_dict["api_base"],
+            api_key=api_dict["api_key"],
+        )
+    else:
+        client = openai.OpenAI()
+
+    if shortcut:
+        batch = client.batches.retrieve(shortcut)
+    else:
+        requests = conv_jsonl_to_batch_format(convs, model, temp, max_tok)
+
+        input_str = "\n".join([json.dumps(requests) for requests in requests])
+        file = io.BytesIO(bytes(input_str, "utf-8"))
+        batch_input_file = client.files.create(file=file, purpose="batch")
+
+        batch_input_file_id = batch_input_file.id
+
+        batch_object = client.batches.create(
+            input_file_id=batch_input_file_id,
+            endpoint="/v1/chat/completions",
+            completion_window="24h",
+            metadata={"description": "Arena hard auto judge job"},
+        )
+
+        status_bits = {
+            "validating": False,
+            "failed": False,
+            "in_progress": False,
+            "finalizing": False,
+            "completed": False,
+            "expired": False,
+            "cancelling": False,
+            "cancelled": False,
+        }
+
+        while True:
+            time.sleep(5)
+            batch = client.batches.retrieve(batch_object.id)
+            print(
+                f"{batch.request_counts.completed} / {batch.request_counts.total}",
+                end="\r",
+            )
+            if not status_bits[batch.status]:
+                print(f"Batch status: {batch.status}")
+                status_bits[batch.status] = True
+            if batch.status == "completed":
+                break
+            if (
+                batch.status == "cancelled"
+                or batch.status == "failed"
+                or batch.status == "expired"
+            ):
+                raise (Exception(f"Batch processing was {batch.status}"))
+
+        print("waiting on file id")
+        while batch.output_file_id is None:
+            time.sleep(1)
+            batch = client.batches.retrieve(batch_object.id)
+
+    output = batch.output_file_id
+    error_out = batch.error_file_id
+
+    file_response = client.files.content(output)
+    if error_out is not None:
+        file_response_error = client.files.content(error_out)
+        if file_response_error.text:
+            print("**API ERRORS**\n{file_response_error.text}")
+    jsonl = [json.loads(line) for line in file_response.text.split("\n") if line]
+    jsonl.sort(key=lambda x: int(x["custom_id"]))
+    jsonl = [
+        line["response"]["body"]["choices"][0]["message"]["content"] for line in jsonl
+    ]
+    return jsonl
+
+
+def match_responses(judgments, responses_flattened):
+    # Keep track of the current position in the responses_flattened list
+    index = 0
+
+    # Iterate over each judgment dictionary
+    new_judgments = []
+    for judgment in judgments:
+        convs_len = len(
+            judgment["convs"]
+        )  # Get the number of items in the "convs" list
+
+        # Extract the corresponding number of responses from the responses_flattened list
+        new_judgment = judgment.copy()
+        new_judgment["responses"] = responses_flattened[index : index + convs_len]
+        new_judgments.append(new_judgment)
+
+        # Move the index forward by the number of responses we just added
+        index += convs_len
+    assert index == len(
+        responses_flattened
+    ), f"diff: {index}, {len(responses_flattened)}"
+    return new_judgments

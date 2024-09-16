@@ -9,3 +9,8 @@ num_choices: 1
 # a list of model to generate answers
 model_list:
   - gpt-3.5-turbo-0125
+
+# a list of local model paths to eval. The model folder name to "model_list" in judge_config.yaml, just like those under "model_list"
+# these models are only unique by model folder name
+model_list_local:
+  - /scratch/public_models/huggingface/meta-llama/Meta-Llama-3-8B-Instruct/
