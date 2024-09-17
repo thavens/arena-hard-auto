@@ -209,34 +209,41 @@ def show_result(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--answer-file", type=str, default="arena-hard-v0.1")
     parser.add_argument(
-        "--judge-file",
+        "--answer_model",
         type=str,
-        default="data/arena-hard-v0.1/model_judgment/gpt-4-1106-preview.jsonl",
+        description="The model name that was previously provided to 'gen_answer_model.py'",
     )
-    # parser.add_argument("--judge-name", type=str, default="gpt-4-1106-preview")
-    # parser.add_argument("--baseline", type=str, default="gpt-4-0314")
-    # parser.add_argument("--load-bootstrap", action="store_true")
-    # parser.add_argument("--show-elo", action="store_true")
-    # parser.add_argument("--weight", type=int, default=3)
-    # parser.add_argument("--num-rounds", type=int, default=100)
-    # parser.add_argument("--first-game-only", action="store_true")
+    parser.add_argument(
+        "--judge_model",
+        type=str,
+        default="gpt-4o-mini-2024-07-18",
+        choices=["gpt-4o-mini-2024-07-18", "gpt-4-1106-preview"],
+    )
     args = parser.parse_args()
     print(args)
-    # assert not args.load_bootstrap or (args.load_battles and args.load_bootstrap), "If loading prexisting bootstrapping data, you must also load preexisting battles."
+
     base_folder = Path(__file__).absolute().parent
-    with open(args.answer_file) as f:
+    answer_file = (
+        base_folder / f"data/arena-hard-v0.2/answers/{args.answer_model}.jsonl"
+    )
+    judgment_file = (
+        base_folder
+        / f"data/arena-hard-v0.2/judgments/{args.judge_model}/{args.answer_model}.jsonl"
+    )
+
+    with open(answer_file) as f:
         model_answers = [json.loads(line) for line in f]
         model_answers = {
             model_answers[0]["model_id"]: {i["question_id"]: i for i in model_answers}
         }
 
+    # open the gpt-4 comparison answers so that we can get the average token length data.
     with open(base_folder / "data/arena-hard-v0.1/model_answer/gpt-4-0314.jsonl") as f:
         ma = [json.loads(line) for line in f]
         model_answers[ma[0]["model_id"]] = {i["question_id"]: i for i in ma}
 
-    with open(args.judge_file) as f:
+    with open(judgment_file) as f:
         judgments = [json.loads(line) for line in f]
 
     show_result(judgments, model_answers)

@@ -32,7 +32,14 @@ def question_to_conv(question):
 
     return conv
 
-def gen_answers(model: str, temperature: float = 0.0, max_tokens: int = 4096, num_choices: int = 1) -> list:
+
+def gen_answers(
+    model: str,
+    model_id: str,
+    temperature: float = 0.0,
+    max_tokens: int = 4096,
+    num_choices: int = 1,
+) -> list:
     """generate answers for 1 model without caching for arena hard auto
 
     Args:
@@ -43,14 +50,12 @@ def gen_answers(model: str, temperature: float = 0.0, max_tokens: int = 4096, nu
 
     Returns:
         list: jsonl of answers in format for arena hard auto
-    """    
-    
+    """
+
     base_folder = Path(__file__).absolute().parent
     question_file = base_folder / "data/arena-hard-v0.1/question.jsonl"
-    
-    questions = load_questions(question_file)
 
-    model_id = Path(model).name
+    questions = load_questions(question_file)
 
     convs = []
     for question in questions:
@@ -59,9 +64,7 @@ def gen_answers(model: str, temperature: float = 0.0, max_tokens: int = 4096, nu
 
     tokenizer = AutoTokenizer.from_pretrained(model)
     llm = LLM(model=model, tensor_parallel_size=1)
-    sampling_params = SamplingParams(
-        temperature=temperature, max_tokens=max_tokens
-    )
+    sampling_params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
     prompts = tokenizer.apply_chat_template(
         convs, add_generation_prompt=True, tokenize=False
     )
@@ -94,18 +97,20 @@ def gen_answers(model: str, temperature: float = 0.0, max_tokens: int = 4096, nu
         answers.append(ans)
     return answers
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_path", type=str)
+    parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--model_name", type=str, required=True)
     args = parser.parse_args()
-    answer_file = "tmp_output.jsonl"
 
-    answers = gen_answers(args.model_path)
-    
+    base_folder = Path(__file__).absolute().parent
+    os.makedirs(base_folder / "data/arena-hard-v0.2/answers", exist_ok=True)
+    answer_file = base_folder / f"data/arena-hard-v0.2/answers/{args.model_name}.jsonl"
+
+    answers = gen_answers(args.model_path, args.model_name)
 
     with open(answer_file, "a") as fout:
         answers_str = [json.dumps(ans) for ans in answers]
         fout.write("\n".join(answers_str))
         fout.write("\n")
-
-    reorg_answer_file(answer_file)
