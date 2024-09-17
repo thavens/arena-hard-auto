@@ -41,7 +41,7 @@ def get_judge_prompt(**args):
     output = {
         "question_id": question["question_id"],
         "model": answer["model_id"],
-        "judge": model,
+        "judge": configs["judge_model"],
         "games": [],
         "output_file": args["output_file"],
     }

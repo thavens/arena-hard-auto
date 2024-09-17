@@ -17,7 +17,7 @@ import shortuuid
 import tqdm
 
 from transformers import AutoTokenizer
-from vllm import LLM, SamplingParams
+from vllm import LLM, SamplingParams, RequestOutput
 
 from add_markdown_info import count_markdown_elements, remove_pattern
 from utils import (
@@ -96,7 +96,6 @@ if __name__ == "__main__":
         prompts = tokenizer.apply_chat_template(
             convs, add_generation_prompt=True, tokenize=False
         )
-        from vllm import RequestOutput
 
         responses: list[RequestOutput] = llm.generate(prompts, sampling_params)
 
