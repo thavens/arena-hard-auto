@@ -9,6 +9,9 @@ import io
 from typing import Optional
 from glob import glob
 
+import dotenv
+dotenv.load_dotenv()
+
 # API setting constants
 API_MAX_RETRY = 16
 API_RETRY_SLEEP = 10
