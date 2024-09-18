@@ -212,7 +212,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--answer_model",
         type=str,
-        description="The model name that was previously provided to 'gen_answer_model.py'",
+        help="The model name that was previously provided to 'gen_answer_model.py'",
     )
     parser.add_argument(
         "--judge_model",

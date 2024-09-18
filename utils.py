@@ -459,13 +459,24 @@ def batch_api_call(
     if error_out is not None:
         file_response_error = client.files.content(error_out)
         if file_response_error.text:
-            print("**API ERRORS**\n{file_response_error.text}")
+            print(f"**API ERRORS**\n{file_response_error.text}")
     jsonl = [json.loads(line) for line in file_response.text.split("\n") if line]
-    jsonl.sort(key=lambda x: int(x["custom_id"]))
-    jsonl = [
-        line["response"]["body"]["choices"][0]["message"]["content"] for line in jsonl
-    ]
-    return jsonl
+    request_id_2_response = {l["custom_id"]: l for l in jsonl}
+    
+    # the order is baseline first, then answer after. Second game is answer first baseline second
+    # even index is baseline first, odd index is answer first
+    # if index even, and answer is missing then A>B
+    # if index odd, and answer is missing then A>B
+    judgments = []
+    for i in range(len(convs)):
+        if f"{i}" not in request_id_2_response and i % 2 == 0:
+            judgments.append("[[A>B]]")
+        elif f"{i}" not in request_id_2_response and i % 2 == 1:
+            judgments.append("[[A<B]]")
+        else:
+            judgments.append(request_id_2_response[str(i)]["response"]["body"]["choices"][0]["message"]["content"])
+            
+    return judgments
 
 
 def match_responses(judgments, responses_flattened):

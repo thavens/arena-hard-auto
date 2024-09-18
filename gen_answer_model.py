@@ -63,7 +63,7 @@ def gen_answers(
             convs.append(question_to_conv(question))
 
     tokenizer = AutoTokenizer.from_pretrained(model)
-    llm = LLM(model=model, tensor_parallel_size=1)
+    llm = LLM(model=model, tensor_parallel_size=1, max_model_len=max_tokens)
     sampling_params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
     prompts = tokenizer.apply_chat_template(
         convs, add_generation_prompt=True, tokenize=False

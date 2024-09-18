@@ -129,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--answer_model",
         type=str,
-        description="The model name that was previously provided to 'gen_answer_model.py'",
+        help="The model name that was previously provided to 'gen_answer_model.py'",
     )
     parser.add_argument(
         "--judge_model",
@@ -141,13 +141,20 @@ if __name__ == "__main__":
     print(args)
 
     base_folder = Path(__file__).absolute().parent
-    os.makedirs(base_folder / "judgments" / args.judge_model, exist_ok=True)
-    answer_file = base_folder / "data/arena-hard-v0.2/answers" / args.answer_model
+    os.makedirs(
+        base_folder / "data/arena-hard-v0.2/judgments" / args.judge_model, exist_ok=True
+    )
+    answer_file = (
+        base_folder / "data/arena-hard-v0.2/answers" / f"{args.answer_model}.jsonl"
+    )
     judge_output = (
-        base_folder / "judgments" / args.judge_model / f"{args.answer_model}.jsonl"
+        base_folder
+        / "data/arena-hard-v0.2/judgments"
+        / args.judge_model
+        / f"{args.answer_model}.jsonl"
     )
 
-    with open(args.answer_file) as f:
+    with open(answer_file) as f:
         answers = [json.loads(line) for line in f]
     judgments = batch_eval_answers(answers, args.judge_model)
 
