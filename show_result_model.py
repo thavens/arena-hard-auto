@@ -206,6 +206,8 @@ def show_result(
             f"{row['model'] : <30} | score: {round(row['score'], decimal) : ^5} | 95% CI: {interval : ^12} | average #tokens: {int(row['avg_tokens'])}"
         )
 
+    print(row['score'])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
