@@ -75,13 +75,14 @@ def batch_eval_answers(
     judge_model: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.0,
     max_tokens: int = 4096,
+    reference_model: str = "gpt-4-0314"
 ):
     base_folder = Path(__file__).absolute().parent
     pattern = re.compile(r"\[\[([AB<>=]+)\]\]")
     question_file = base_folder / "data" / "arena-hard-v0.1" / "question.jsonl"
     questions = load_questions(question_file)
     with open(
-        base_folder / "data" / "arena-hard-v0.1" / "model_answer" / "gpt-4-0314.jsonl"
+        base_folder / "data" / "arena-hard-v0.1" / "model_answer" / f"{reference_model}.jsonl"
     ) as f:
         baseline_answers = [json.loads(line) for line in f]
 
@@ -136,6 +137,12 @@ if __name__ == "__main__":
         type=str,
         default="gpt-4o-mini-2024-07-18",
         choices=["gpt-4o-mini-2024-07-18", "gpt-4-1106-preview"],
+    )
+    parser.add_argument(
+        "--reference_answers",
+        type=str,
+        default="Mistral-7B-Instruct-v0.3",
+        choices=["Mistral-7B-Instruct-v0.3", "gpt-4-0314"],
     )
     args = parser.parse_args()
     print(args)
