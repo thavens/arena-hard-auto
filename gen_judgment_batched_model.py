@@ -7,6 +7,7 @@ from pathlib import Path
 from utils import (
     load_questions,
     batch_api_call,
+    pool_api_call,
     match_responses,
 )
 
@@ -70,13 +71,14 @@ def get_judge_prompt(question, answer, baseline, pairwise=True):
 
 
 # keys: question_id, model, judge, games [{user_prompt, judgment, score}]
-def batch_eval_answers(
+def eval_answers(
     answers: list,
     baseline_answers: list,
     questions: list[dict],
     judge_model: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.0,
     max_tokens: int = 4096,
+    use_batch_api: bool = True,
 ):
     pattern = re.compile(r"\[\[([AB<>=]+)\]\]")
 
@@ -93,12 +95,20 @@ def batch_eval_answers(
         judgments.append(output_objects)
 
     flattened_list = [conv for judgment in judgments for conv in judgment["convs"]]
-    responses_flattened = batch_api_call(
-        flattened_list,
-        judge_model,
-        temperature,
-        max_tokens,
-    )
+    if use_batch_api:
+        responses_flattened = batch_api_call(
+            flattened_list,
+            judge_model,
+            temperature,
+            max_tokens,
+        )
+    else:
+        responses_flattened = pool_api_call(
+            flattened_list,
+            judge_model,
+            temperature,
+            max_tokens,
+        )
     judgments = match_responses(
         judgments=judgments, responses_flattened=responses_flattened
     )
@@ -139,6 +149,7 @@ if __name__ == "__main__":
         choices=["Mistral-7B-Instruct-v0.3", "gpt-4-0314"],
     )
     parser.add_argument("--benchmark", type=str, required=True)
+    parser.add_argument("--use_batch_api", action="store_true", default=False)
     args = parser.parse_args()
     print(args)
 
@@ -174,8 +185,8 @@ if __name__ == "__main__":
     ) as f:
         baseline_answers = [json.loads(line) for line in f]
 
-    judgments = batch_eval_answers(
-        answers, baseline_answers, questions, args.judge_model
+    judgments = eval_answers(
+        answers, baseline_answers, questions, args.judge_model, use_batch_api=args.use_batch_api
     )
 
     with open(judge_output, "w") as f:

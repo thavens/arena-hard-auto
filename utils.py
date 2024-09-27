@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import json
 import time
@@ -6,8 +7,16 @@ import random
 import requests
 import io
 
+import openai
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_delay,
+    wait_random_exponential,
+)
 from typing import Optional
 from glob import glob
+from tqdm import tqdm
 
 import dotenv
 dotenv.load_dotenv()
@@ -44,6 +53,23 @@ temperature_config = {
     "stem": 0.1,
     "humanities": 0.1,
 }
+
+
+@retry(
+    retry=retry_if_exception_type(
+        (
+            openai.RateLimitError,
+            openai.InternalServerError,
+        )
+    ),
+    wait=wait_random_exponential(min=1, max=10),
+    stop=stop_after_delay(60),
+)
+def create_with_retry(client, *args, **kwargs):
+    try:
+        return client.chat.completions.create(*args, **kwargs)
+    except openai.ContentFilterFinishReasonError:
+        return None
 
 
 def load_questions(question_file: str):
@@ -480,6 +506,45 @@ def batch_api_call(
             judgments.append(request_id_2_response[str(i)]["response"]["body"]["choices"][0]["message"]["content"])
             
     return judgments
+
+
+def pool_api_call(convs: list[list], model: str, temp: float, max_tok: int, api_dict=None, shortcut=""):
+    if len(convs) == 0:
+        return []
+
+    if api_dict:
+        client = openai.OpenAI(
+            base_url=api_dict["api_base"],
+            api_key=api_dict["api_key"],
+        )
+    else:
+        client = openai.OpenAI()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
+        threads = {}
+        for i in range(len(convs)):
+            t = executor.submit(create_with_retry, client=client, model=model, messages=convs[i], temperature=temp, max_tokens=max_tok)
+            threads[t] = i
+        
+        results = {}
+        for t in tqdm(concurrent.futures.as_completed(threads), total=len(convs)):
+            if result := t.result():
+                results[threads[t]] = result.choices[0].message.content
+
+    # the order is baseline first, then answer after. Second game is answer first baseline second
+    # even index is baseline first, odd index is answer first
+    # if index even, and answer is missing then A>B
+    # if index odd, and answer is missing then A>B
+    judgements = []
+    for i in range(len(convs)):
+        if i not in results and i % 2 == 0:
+            judgements.append("[[A>B]]")
+        elif i not in results and i % 2 == 1:
+            judgements.append("[[A<B]]")
+        else:
+            judgements.append(results[i])
+
+    return judgements
 
 
 def match_responses(judgments, responses_flattened):
