@@ -72,19 +72,13 @@ def get_judge_prompt(question, answer, baseline, pairwise=True):
 # keys: question_id, model, judge, games [{user_prompt, judgment, score}]
 def batch_eval_answers(
     answers: list,
+    baseline_answers: list,
+    questions: list[dict],
     judge_model: str = "gpt-4o-mini-2024-07-18",
     temperature: float = 0.0,
     max_tokens: int = 4096,
-    reference_model: str = "gpt-4-0314"
 ):
-    base_folder = Path(__file__).absolute().parent
     pattern = re.compile(r"\[\[([AB<>=]+)\]\]")
-    question_file = base_folder / "data" / "arena-hard-v0.1" / "question.jsonl"
-    questions = load_questions(question_file)
-    with open(
-        base_folder / "data" / "arena-hard-v0.1" / "model_answer" / f"{reference_model}.jsonl"
-    ) as f:
-        baseline_answers = [json.loads(line) for line in f]
 
     baseline_answers = {answer["question_id"]: answer for answer in baseline_answers}
     model_answers = {answer["question_id"]: answer for answer in answers}
@@ -139,31 +133,50 @@ if __name__ == "__main__":
         choices=["gpt-4o-mini-2024-07-18", "gpt-4-1106-preview"],
     )
     parser.add_argument(
-        "--reference_answers",
+        "--baseline_model",
         type=str,
         default="Mistral-7B-Instruct-v0.3",
         choices=["Mistral-7B-Instruct-v0.3", "gpt-4-0314"],
     )
+    parser.add_argument("--benchmark", type=str, required=True)
     args = parser.parse_args()
     print(args)
 
     base_folder = Path(__file__).absolute().parent
     os.makedirs(
-        base_folder / "data/arena-hard-v0.2/judgments" / args.judge_model, exist_ok=True
+        base_folder / "data" / args.benchmark / "judgments" / args.judge_model,
+        exist_ok=True,
     )
     answer_file = (
-        base_folder / "data/arena-hard-v0.2/answers" / f"{args.answer_model}.jsonl"
+        base_folder / "data" / args.benchmark / "answers" / f"{args.answer_model}.jsonl"
     )
     judge_output = (
         base_folder
-        / "data/arena-hard-v0.2/judgments"
+        / "data"
+        / args.benchmark
+        / "judgments"
         / args.judge_model
         / f"{args.answer_model}.jsonl"
     )
 
+    question_file = base_folder / "data" / args.benchmark / "question.jsonl"
+    questions = load_questions(question_file)
+
     with open(answer_file) as f:
         answers = [json.loads(line) for line in f]
-    judgments = batch_eval_answers(answers, args.judge_model)
+
+    with open(
+        base_folder
+        / "data"
+        / args.benchmark
+        / "answers"
+        / f"{args.baseline_model}.jsonl"
+    ) as f:
+        baseline_answers = [json.loads(line) for line in f]
+
+    judgments = batch_eval_answers(
+        answers, baseline_answers, questions, args.judge_model
+    )
 
     with open(judge_output, "w") as f:
         f.write("\n".join([json.dumps(judgment) for judgment in judgments]))

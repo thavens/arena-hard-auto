@@ -206,8 +206,7 @@ def show_result(
             f"{row['model'] : <30} | score: {round(row['score'], decimal) : ^5} | 95% CI: {interval : ^12} | average #tokens: {int(row['avg_tokens'])}"
         )
 
-    print(row['score'])
-
+    return stats
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -217,21 +216,30 @@ if __name__ == "__main__":
         help="The model name that was previously provided to 'gen_answer_model.py'",
     )
     parser.add_argument(
+        "--baseline_model",
+        type=str,
+        default="Mistral-7B-Instruct-v0.3",
+        choices=["Mistral-7B-Instruct-v0.3", "gpt-4-0314"],
+    )
+    parser.add_argument(
         "--judge_model",
         type=str,
         default="gpt-4o-mini-2024-07-18",
         choices=["gpt-4o-mini-2024-07-18", "gpt-4-1106-preview"],
     )
+    parser.add_argument("--benchmark", type=str, required=True)
     args = parser.parse_args()
     print(args)
 
     base_folder = Path(__file__).absolute().parent
     answer_file = (
-        base_folder / f"data/arena-hard-v0.2/answers/{args.answer_model}.jsonl"
+        base_folder / "data" / args.benchmark / f"answers/{args.answer_model}.jsonl"
     )
     judgment_file = (
         base_folder
-        / f"data/arena-hard-v0.2/judgments/{args.judge_model}/{args.answer_model}.jsonl"
+        / "data"
+        / args.benchmark
+        / f"judgments/{args.judge_model}/{args.answer_model}.jsonl"
     )
 
     with open(answer_file) as f:
@@ -241,11 +249,12 @@ if __name__ == "__main__":
         }
 
     # open the gpt-4 comparison answers so that we can get the average token length data.
-    with open(base_folder / "data/arena-hard-v0.1/model_answer/gpt-4-0314.jsonl") as f:
+    with open(base_folder / "data" / args.benchmark / "answers" / f"{args.baseline_model}.jsonl") as f:
         ma = [json.loads(line) for line in f]
         model_answers[ma[0]["model_id"]] = {i["question_id"]: i for i in ma}
 
     with open(judgment_file) as f:
         judgments = [json.loads(line) for line in f]
 
-    show_result(judgments, model_answers)
+    stats = show_result(judgments, model_answers, baseline=args.baseline_model)
+    print(stats[stats["model"] == args.answer_model]["score"].item())

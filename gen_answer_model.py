@@ -36,6 +36,7 @@ def question_to_conv(question):
 def gen_answers(
     model: str,
     model_id: str,
+    questions: str,
     temperature: float = 0.0,
     max_tokens: int = 4096,
     num_choices: int = 1,
@@ -51,12 +52,6 @@ def gen_answers(
     Returns:
         list: jsonl of answers in format for arena hard auto
     """
-
-    base_folder = Path(__file__).absolute().parent
-    question_file = base_folder / "data/arena-hard-v0.1/question.jsonl"
-
-    questions = load_questions(question_file)
-
     convs = []
     for question in questions:
         for i in range(num_choices):
@@ -102,13 +97,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--benchmark", type=str, required=True)
     args = parser.parse_args()
 
     base_folder = Path(__file__).absolute().parent
-    os.makedirs(base_folder / "data/arena-hard-v0.2/answers", exist_ok=True)
-    answer_file = base_folder / f"data/arena-hard-v0.2/answers/{args.model_name}.jsonl"
+    os.makedirs(base_folder / "data" / args.benchmark / "answers", exist_ok=True)
+    answer_file = (
+        base_folder / "data" / args.benchmark / "answers" / f"{args.model_name}.jsonl"
+    )
 
-    answers = gen_answers(args.model_path, args.model_name)
+    base_folder = Path(__file__).absolute().parent
+    question_file = base_folder / "data" / args.benchmark / "question.jsonl"
+
+    questions = load_questions(question_file)
+    answers = gen_answers(args.model_path, args.model_name, questions)
 
     with open(answer_file, "a") as fout:
         answers_str = [json.dumps(ans) for ans in answers]
