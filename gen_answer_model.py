@@ -12,6 +12,7 @@ from pathlib import Path
 
 import shortuuid
 
+import torch
 from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams, RequestOutput
 
@@ -58,7 +59,7 @@ def gen_answers(
             convs.append(question_to_conv(question))
 
     tokenizer = AutoTokenizer.from_pretrained(model)
-    llm = LLM(model=model, tensor_parallel_size=1, max_model_len=max_tokens)
+    llm = LLM(model=model, tensor_parallel_size=torch.cuda.device_count(), max_model_len=max_tokens)
     sampling_params = SamplingParams(temperature=temperature, max_tokens=max_tokens)
     prompts = tokenizer.apply_chat_template(
         convs, add_generation_prompt=True, tokenize=False
@@ -112,7 +113,7 @@ if __name__ == "__main__":
     questions = load_questions(question_file)
     answers = gen_answers(args.model_path, args.model_name, questions)
 
-    with open(answer_file, "a") as fout:
+    with open(answer_file, "w") as fout:
         answers_str = [json.dumps(ans) for ans in answers]
         fout.write("\n".join(answers_str))
         fout.write("\n")
