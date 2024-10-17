@@ -99,6 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--model_name", type=str, required=True)
     parser.add_argument("--benchmark", type=str, required=True)
+    parser.add_argument("--max-len", type=int, default=4096)
     args = parser.parse_args()
 
     base_folder = Path(__file__).absolute().parent
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     question_file = base_folder / "data" / args.benchmark / "question.jsonl"
 
     questions = load_questions(question_file)
-    answers = gen_answers(args.model_path, args.model_name, questions)
+    answers = gen_answers(args.model_path, args.model_name, questions, max_tokens=args.max_len)
 
     with open(answer_file, "w") as fout:
         answers_str = [json.dumps(ans) for ans in answers]
